@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
 
     // 1. Insere na tabela 'vendas'
-    const { data: venda, error } = await supabaseAdmin
+    const { data: venda, error } = await supabaseAdmin!
       .from('vendas')
       .insert({
         pizza_id: body.items[0]?.pizza?.id,

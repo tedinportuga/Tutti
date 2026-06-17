@@ -19,7 +19,7 @@ export default function HomePage() {
             Sistema de gestão interno
           </p>
         </div>
-        <p style={{ fontSize: 12, color: '#9FC4A8' }}>© 2024</p>
+        <p style={{ fontSize: 12, color: '#9FC4A8' }}>© 2026</p>
       </aside>
 
       {/* Main */}

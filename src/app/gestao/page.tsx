@@ -35,13 +35,15 @@ export default function GestaoPage() {
     async function fetchVendas() {
       const hoje = new Date()
       hoje.setHours(0,0,0,0)
+      console.log('Fetching vendas desde:', hoje.toISOString())
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('vendas')
         .select('*')
         .gte('vendido_em', hoje.toISOString())
         .order('vendido_em', { ascending: false })
 
+      console.log('Vendas:', data, 'Erro:', error)
       if (data) setVendas(data)
     }
 

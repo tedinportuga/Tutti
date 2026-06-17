@@ -21,6 +21,10 @@ export default function GestaoPage() {
   const router = useRouter()
   const [showPdf, setShowPdf] = useState(false)
   const [vendas, setVendas] = useState<any[]>([])
+  const [showReset, setShowReset] = useState(false)
+  const [senhaInput, setSenhaInput] = useState('')
+  const [resetErro, setResetErro] = useState(false)
+  const [resetOk, setResetOk] = useState(false)
 
   useEffect(() => {
     const supabase = createClient(
@@ -52,6 +56,24 @@ export default function GestaoPage() {
 
     return () => { supabase.removeChannel(channel) }
   }, [])
+
+  async function handleReset() {
+    if (senhaInput !== 'Carol123') {
+      setResetErro(true)
+      setTimeout(() => setResetErro(false), 2000)
+      return
+    }
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+    await supabase.from('vendas').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    setVendas([])
+    setResetOk(true)
+    setShowReset(false)
+    setSenhaInput('')
+    setTimeout(() => setResetOk(false), 3000)
+  }
 
   const agora = new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
   const hoje = new Date().toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -242,6 +264,14 @@ export default function GestaoPage() {
                 </div>
               </div>
 
+              <button
+                onClick={() => setShowReset(true)}
+                style={{ width: '100%', padding: 18, borderRadius: 14, fontSize: 16,
+                  background: '#fff', color: '#1B3A2D', border: '1.5px solid #D8D0C4',
+                  cursor: 'pointer', marginBottom: 12 }}>
+                Resetar vendas do dia
+              </button>
+
               <button onClick={() => setShowPdf(true)} className="font-display"
                 style={{ width: '100%', padding: 18, borderRadius: 14, fontSize: 21, background: O, color: '#fff', border: 'none', cursor: 'pointer' }}>
                 Exportar PDF do dia
@@ -250,6 +280,52 @@ export default function GestaoPage() {
           )}
         </div>
       </div>
+
+      {showReset && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+          <div style={{ background: '#fff', borderRadius: 20, padding: 28, width: 320 }}>
+            <h3 className="font-display" style={{ fontSize: 22, color: '#1B3A2D', marginBottom: 8 }}>
+              Confirmar reset
+            </h3>
+            <p style={{ fontSize: 13, color: '#9FC4A8', marginBottom: 20 }}>
+              Insere a senha para apagar todas as vendas de hoje.
+            </p>
+            <input
+              type="password"
+              placeholder="Senha"
+              value={senhaInput}
+              onChange={e => setSenhaInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleReset()}
+              style={{ width: '100%', padding: '12px 14px', borderRadius: 10,
+                border: resetErro ? '2px solid #D4751A' : '1.5px solid #D8D0C4',
+                fontSize: 15, marginBottom: 8, outline: 'none', boxSizing: 'border-box' }}
+            />
+            {resetErro && (
+              <p style={{ fontSize: 12, color: '#D4751A', marginBottom: 8 }}>Senha incorrecta</p>
+            )}
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <button onClick={() => { setShowReset(false); setSenhaInput('') }}
+                style={{ flex: 1, padding: 12, borderRadius: 10, fontSize: 14,
+                  background: '#fff', border: '1.5px solid #D8D0C4', color: '#1B3A2D', cursor: 'pointer' }}>
+                Cancelar
+              </button>
+              <button onClick={handleReset}
+                style={{ flex: 1, padding: 12, borderRadius: 10, fontSize: 14,
+                  background: '#D4751A', color: '#fff', border: 'none', cursor: 'pointer' }}>
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {resetOk && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          background: '#1B3A2D', color: '#F5E6C8', padding: '12px 24px', borderRadius: 12, fontSize: 14 }}>
+          ✓ Vendas resetadas com sucesso
+        </div>
+      )}
     </div>
   )
 }

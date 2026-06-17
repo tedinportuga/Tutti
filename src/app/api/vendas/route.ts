@@ -1,18 +1,30 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
     const { sabor, modelo, qty } = body
 
-    if (!supabaseAdmin) {
-      return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
-    }
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
 
-    const { data, error } = await supabaseAdmin
+    const agora = new Date()
+    const diaSemana = agora.getDay()
+    const hora = agora.getHours()
+
+    const { data, error } = await supabase
       .from('vendas')
-      .insert({ sabor, modelo, quantidade: qty, vendido_em: new Date().toISOString() })
+      .insert({
+        sabor,
+        modelo,
+        quantidade: qty,
+        vendido_em: agora.toISOString(),
+        dia_semana: diaSemana,
+        hora: hora
+      })
       .select()
       .single()
 

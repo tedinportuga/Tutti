@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@supabase/supabase-js'
 import { TuttiLogo, TuttiLogoSmall } from '@/components/TuttiLogo'
 import { CORES } from '@/lib/constants'
 
@@ -16,23 +17,46 @@ const LiveDot = () => (
   <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ADE80', display: 'inline-block', flexShrink: 0 }}/>
 )
 
-const VENDAS_MOCK = [
-  { hora: '20:14', sabor: 'Di Faro', modelo: 'Sabores do Mar', qty: 2 },
-  { hora: '19:58', sabor: 'Margherita', modelo: 'Clássica', qty: 1 },
-  { hora: '19:32', sabor: 'A Moda Tutti', modelo: 'Premium', qty: 1 },
-  { hora: '19:10', sabor: 'Portuguesa', modelo: 'Especial', qty: 3 },
-  { hora: '18:47', sabor: 'Pesto di Faro', modelo: 'Premium', qty: 1 },
-  { hora: '18:22', sabor: 'Di Faro', modelo: 'Sabores do Mar', qty: 2 },
-]
-
 export default function GestaoPage() {
   const router = useRouter()
   const [showPdf, setShowPdf] = useState(false)
+  const [vendas, setVendas] = useState<any[]>([])
+
+  useEffect(() => {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+
+    async function fetchVendas() {
+      const hoje = new Date()
+      hoje.setHours(0,0,0,0)
+
+      const { data } = await supabase
+        .from('vendas')
+        .select('*')
+        .gte('vendido_em', hoje.toISOString())
+        .order('vendido_em', { ascending: false })
+
+      if (data) setVendas(data)
+    }
+
+    fetchVendas()
+
+    // Real-time
+    const channel = supabase
+      .channel('vendas')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vendas' },
+        () => fetchVendas())
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   const agora = new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
   const hoje = new Date().toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' })
-  const total = VENDAS_MOCK.reduce((s, v) => s + v.qty, 0)
-  const topSabor = 'Di Faro'
+  const total = vendas.reduce((s, v) => s + v.quantidade, 0)
+  const topSabor = vendas.length > 0 ? [...vendas].sort((a,b) => b.quantidade - a.quantidade)[0].sabor : '—'
 
   const heatmap = [
     [0,0,1,2,4,6,8,5,3,1],[0,1,2,3,5,9,12,8,4,2],[0,0,1,2,3,5,7,4,2,1],
@@ -98,7 +122,7 @@ export default function GestaoPage() {
                   <div style={{ fontSize: 11, color: '#6B9E7A', marginTop: 3, textTransform: 'capitalize' }}>{hoje}</div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 20 }}>
-                  {[{ label: 'Total', value: String(total) }, { label: 'Registos', value: String(VENDAS_MOCK.length) }, { label: 'Pico', value: '20h' }].map(k => (
+                  {[{ label: 'Total', value: String(total) }, { label: 'Registos', value: String(vendas.length) }, { label: 'Pico', value: '20h' }].map(k => (
                     <div key={k.label} style={{ background: F, borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
                       <div style={{ fontSize: 9, color: '#9FC4A8', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 3 }}>{k.label}</div>
                       <div className="font-display" style={{ fontSize: 20, color: V }}>{k.value}</div>
@@ -116,13 +140,16 @@ export default function GestaoPage() {
                 </div>
                 <div>
                   <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: 2, color: '#9FC4A8', marginBottom: 8 }}>Detalhe</div>
-                  {VENDAS_MOCK.map((v, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid #F5F0EA', fontSize: 11 }}>
-                      <span style={{ color: '#9FC4A8', minWidth: 40 }}>{v.hora}</span>
-                      <span style={{ color: V, flex: 1, paddingLeft: 8 }}>{v.sabor}</span>
-                      <span style={{ color: O, fontWeight: 600 }}>×{v.qty}</span>
-                    </div>
-                  ))}
+                  {vendas.map((v, i) => {
+                    const hora = new Date(v.vendido_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+                    return (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid #F5F0EA', fontSize: 11 }}>
+                        <span style={{ color: '#9FC4A8', minWidth: 40 }}>{hora}</span>
+                        <span style={{ color: V, flex: 1, paddingLeft: 8 }}>{v.sabor}</span>
+                        <span style={{ color: O, fontWeight: 600 }}>×{v.quantidade}</span>
+                      </div>
+                    )
+                  })}
                 </div>
                 <div style={{ marginTop: 20, paddingTop: 12, borderTop: '1px solid #D8D0C4', textAlign: 'center' }}>
                   <div style={{ fontSize: 9, color: '#C8C0B8', textTransform: 'uppercase', letterSpacing: 2 }}>Tutti Pizzaria · Algarve · +351 925 748 282</div>
@@ -188,18 +215,21 @@ export default function GestaoPage() {
               <div style={{ marginBottom: 24 }}>
                 <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.08em', color: VM, marginBottom: 12 }}>HISTÓRICO DE HOJE</div>
                 <div style={{ borderRadius: 18, overflow: 'hidden', background: '#fff', border: '1.5px solid #D8D0C4' }}>
-                  {VENDAS_MOCK.map((v, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 18px', borderBottom: i < VENDAS_MOCK.length - 1 ? '1px solid #F0EAE0' : 'none' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                        <span style={{ fontSize: 12, fontWeight: 500, color: V, fontVariantNumeric: 'tabular-nums' }}>{v.hora}</span>
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 500, color: V }}>{v.sabor}</div>
-                          <div style={{ fontSize: 11, color: '#9FC4A8' }}>{v.modelo}</div>
+                  {vendas.map((v, i) => {
+                    const hora = new Date(v.vendido_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+                    return (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 18px', borderBottom: i < vendas.length - 1 ? '1px solid #F0EAE0' : 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                          <span style={{ fontSize: 12, fontWeight: 500, color: V, fontVariantNumeric: 'tabular-nums' }}>{hora}</span>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: V }}>{v.sabor}</div>
+                            <div style={{ fontSize: 11, color: '#9FC4A8' }}>{v.modelo}</div>
+                          </div>
                         </div>
+                        <span style={{ fontSize: 13, fontWeight: 500, color: O }}>×{v.quantidade}</span>
                       </div>
-                      <span style={{ fontSize: 13, fontWeight: 500, color: O }}>×{v.qty}</span>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
 

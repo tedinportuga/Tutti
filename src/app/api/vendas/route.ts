@@ -1,43 +1,27 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const body = await req.json()
+    const body = await request.json()
+    const { sabor, modelo, qty } = body
 
-    // 1. Insere na tabela 'vendas'
-    const { data: venda, error } = await supabaseAdmin!
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
+    }
+
+    const { data, error } = await supabaseAdmin
       .from('vendas')
-      .insert({
-        pizza_id: body.items[0]?.pizza?.id,
-        quantidade: body.items[0]?.quantidade,
-      })
-      .select('*, pizzas:pizza_id(sabor, modelo)')
+      .insert({ sabor, modelo, quantidade: qty, vendido_em: new Date().toISOString() })
+      .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
 
-    // 2. Busca dados da pizza (já retornado acima com select)
-    const sabor = venda.pizzas?.sabor
-    const modelo = venda.pizzas?.modelo
-    const hora = new Date(venda.vendido_em).toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
-
-    // 3. Chama /api/notificacao para WhatsApp
-    await fetch(`${process.env.VERCEL_URL || 'http://localhost:3000'}/api/notificacao`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sabor,
-        modelo,
-        quantidade: body.items[0]?.quantidade,
-        hora,
-        total: body.items[0]?.quantidade,
-      }),
-    })
-
-    // 4. Retorna { success: true, venda }
-    return NextResponse.json({ success: true, venda })
-  } catch (error) {
-    return NextResponse.json({ success: false, error: String(error) }, { status: 500 })
+    return NextResponse.json({ success: true, data })
+  } catch (err) {
+    return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
 }

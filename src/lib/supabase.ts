@@ -88,13 +88,3 @@ export async function fetchHeatmapData(): Promise<
   if (error) throw error;
   return data || [];
 }
-
-// Helper: Subscribe to real-time sales
-export function subscribeToPizzas(
-  callback: (payload: { new: Venda; old: Venda | null; eventType: string }) => void
-) {
-  return supabase
-    .channel('public:vendas')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'vendas' }, callback)
-    .subscribe();
-}

@@ -58,21 +58,30 @@ export default function GestaoPage() {
   const total = vendas.reduce((s, v) => s + v.quantidade, 0)
   const topSabor = vendas.length > 0 ? [...vendas].sort((a,b) => b.quantidade - a.quantidade)[0].sabor : '—'
 
-  const heatmap = [
-    [0,0,1,2,4,6,8,5,3,1],[0,1,2,3,5,9,12,8,4,2],[0,0,1,2,3,5,7,4,2,1],
-    [0,1,1,3,6,11,14,9,5,2],[0,1,2,4,7,13,16,11,6,3],[0,0,1,2,4,7,9,6,3,1],[0,0,0,1,2,4,5,3,2,0],
-  ]
+  const heatmap = Array(7).fill(null).map(() => Array(10).fill(0))
   const dias = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom']
   const horas = ['14','15','16','17','18','19','20','21','22','23']
   const mx = 16
   const cel = (v: number) => v===0?'#EDE8DF':v/mx<0.25?'#B8D4C0':v/mx<0.5?'#5A9970':v/mx<0.75?VM:V
 
+  const picoHora = vendas.length > 0
+    ? (() => {
+        const contagem: Record<number,number> = {}
+        vendas.forEach(v => {
+          const h = new Date(v.vendido_em).getHours()
+          contagem[h] = (contagem[h]||0) + v.quantidade
+        })
+        const pico = Object.entries(contagem).sort((a,b)=>b[1]-a[1])[0]
+        return pico ? pico[0]+'h' : '—'
+      })()
+    : '—'
+
   const modelosData = [
-    { m: 'Sabores do Mar', c: 18, p: 38 },
-    { m: 'Clássica', c: 14, p: 30 },
-    { m: 'Especial', c: 9, p: 19 },
-    { m: 'Premium', c: 6, p: 13 },
-  ]
+    { m: 'Sabores do Mar', c: vendas.filter(v=>v.modelo==='Sabores do Mar').reduce((s,v)=>s+v.quantidade,0), p: 0 },
+    { m: 'Clássica', c: vendas.filter(v=>v.modelo==='Clássica').reduce((s,v)=>s+v.quantidade,0), p: 0 },
+    { m: 'Especial', c: vendas.filter(v=>v.modelo==='Especial').reduce((s,v)=>s+v.quantidade,0), p: 0 },
+    { m: 'Premium', c: vendas.filter(v=>v.modelo==='Premium').reduce((s,v)=>s+v.quantidade,0), p: 0 },
+  ].map(m => ({ ...m, p: total > 0 ? Math.round(m.c / total * 100) : 0 }))
   const barColors = [V, VM, '#5A9970', '#9FC4A8']
 
   return (
@@ -91,7 +100,7 @@ export default function GestaoPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[
             { label: 'Pizzas hoje', value: String(total), live: true },
-            { label: 'Pico de hora', value: '20h', live: false },
+            { label: 'Pico de hora', value: picoHora, live: false },
             { label: 'Mais vendida', value: topSabor, live: false },
           ].map(k => (
             <div key={k.label} style={{ borderRadius: 13, padding: '12px 14px', background: '#142D22' }}>

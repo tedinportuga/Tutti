@@ -25,6 +25,9 @@ export default function GestaoPage() {
   const [senhaInput, setSenhaInput] = useState('')
   const [resetErro, setResetErro] = useState(false)
   const [resetOk, setResetOk] = useState(false)
+  const [heatmapData, setHeatmapData] = useState(
+    Array(7).fill(null).map(() => Array(10).fill(0))
+  )
 
   useEffect(() => {
     const supabase = createClient(
@@ -47,7 +50,29 @@ export default function GestaoPage() {
       if (data) setVendas(data)
     }
 
+    // Calcula heatmap dos últimos 30 dias
+    async function fetchHeatmap() {
+      const { data } = await supabase
+        .from('vendas')
+        .select('dia_semana, hora, quantidade')
+
+      const matriz = Array(7).fill(null).map(() => Array(10).fill(0))
+
+      if (data) {
+        data.forEach(v => {
+          const diaIndex = v.dia_semana === 0 ? 6 : v.dia_semana - 1
+          const horaIndex = v.hora - 14
+          if (horaIndex >= 0 && horaIndex < 10 && diaIndex >= 0 && diaIndex < 7) {
+            matriz[diaIndex][horaIndex] += v.quantidade
+          }
+        })
+      }
+
+      setHeatmapData(matriz)
+    }
+
     fetchVendas()
+    fetchHeatmap()
 
     // Real-time
     const channel = supabase
@@ -82,7 +107,6 @@ export default function GestaoPage() {
   const total = vendas.reduce((s, v) => s + v.quantidade, 0)
   const topSabor = vendas.length > 0 ? [...vendas].sort((a,b) => b.quantidade - a.quantidade)[0].sabor : '—'
 
-  const heatmap = Array(7).fill(null).map(() => Array(10).fill(0))
   const dias = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom']
   const horas = ['14','15','16','17','18','19','20','21','22','23']
   const mx = 16
@@ -213,7 +237,7 @@ export default function GestaoPage() {
                   <div style={{ display: 'flex', gap: 3, marginBottom: 6, paddingLeft: 34 }}>
                     {horas.map(h => <div key={h} style={{ flex: 1, textAlign: 'center', fontSize: 9, color: '#9FC4A8' }}>{h}h</div>)}
                   </div>
-                  {heatmap.map((row, i) => (
+                  {heatmapData.map((row, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 3 }}>
                       <div style={{ width: 30, textAlign: 'right', paddingRight: 5, fontSize: 9, color: '#9FC4A8', flexShrink: 0 }}>{dias[i]}</div>
                       {row.map((v, j) => <div key={j} style={{ flex: 1, borderRadius: 3, background: cel(v), height: 20 }} />)}

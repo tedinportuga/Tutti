@@ -1,5 +1,6 @@
 import { Playfair_Display, Inter } from 'next/font/google'
 import './globals.css'
+import type { Metadata } from 'next'
 
 const playfair = Playfair_Display({
   subsets: ['latin'],
@@ -12,6 +13,22 @@ const inter = Inter({
   variable: '--font-sans',
   display: 'swap',
 })
+
+export const metadata: Metadata = {
+  title: 'Tutti Pizzaria',
+  description: 'Sistema interno de gestão de saídas — Algarve, Portugal',
+  icons: {
+    icon: '/logo.jpg',
+    apple: '/logo.jpg',
+  },
+  openGraph: {
+    title: 'Tutti Pizzaria',
+    description: 'Sistema interno de gestão — Algarve, Portugal',
+    images: ['/logo.jpg'],
+    locale: 'pt_PT',
+    type: 'website',
+  },
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

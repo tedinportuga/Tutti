@@ -126,11 +126,22 @@ export default function GestaoPage() {
 
   console.log('Modelos nas vendas:', vendas.map(v => v.modelo))
 
+  const topModelo = vendas.length > 0
+    ? [...vendas].sort((a,b) => b.quantidade - a.quantidade)[0].modelo
+    : ''
+
+  const modeloLabels: Record<string,string> = {
+    classica: 'Clássica',
+    sabores_do_mar: 'Sabores do Mar',
+    especial: 'Especial',
+    premium: 'Premium'
+  }
+
   const modelosData = [
-    { m: 'Sabores do Mar', c: vendas.filter(v=>v.modelo==='Sabores do Mar').reduce((s,v)=>s+v.quantidade,0), p: 0 },
-    { m: 'Clássica', c: vendas.filter(v=>v.modelo==='Clássica').reduce((s,v)=>s+v.quantidade,0), p: 0 },
-    { m: 'Especial', c: vendas.filter(v=>v.modelo==='Especial').reduce((s,v)=>s+v.quantidade,0), p: 0 },
-    { m: 'Premium', c: vendas.filter(v=>v.modelo==='Premium').reduce((s,v)=>s+v.quantidade,0), p: 0 },
+    { m: 'Sabores do Mar', key: 'sabores_do_mar', c: vendas.filter(v=>v.modelo==='sabores_do_mar').reduce((s,v)=>s+v.quantidade,0), p: 0 },
+    { m: 'Clássica', key: 'classica', c: vendas.filter(v=>v.modelo==='classica').reduce((s,v)=>s+v.quantidade,0), p: 0 },
+    { m: 'Especial', key: 'especial', c: vendas.filter(v=>v.modelo==='especial').reduce((s,v)=>s+v.quantidade,0), p: 0 },
+    { m: 'Premium', key: 'premium', c: vendas.filter(v=>v.modelo==='premium').reduce((s,v)=>s+v.quantidade,0), p: 0 },
   ].map(m => ({ ...m, p: total > 0 ? Math.round(m.c / total * 100) : 0 }))
   const barColors = [V, VM, '#5A9970', '#9FC4A8']
 
@@ -282,7 +293,7 @@ export default function GestaoPage() {
                           <span style={{ fontSize: 12, fontWeight: 500, color: V, fontVariantNumeric: 'tabular-nums' }}>{hora}</span>
                           <div>
                             <div style={{ fontSize: 13, fontWeight: 500, color: V }}>{v.sabor}</div>
-                            <div style={{ fontSize: 11, color: '#9FC4A8' }}>{v.modelo}</div>
+                            <div style={{ fontSize: 11, color: '#9FC4A8' }}>{modeloLabels[v.modelo] || v.modelo}</div>
                           </div>
                         </div>
                         <span style={{ fontSize: 13, fontWeight: 500, color: O }}>×{v.quantidade}</span>

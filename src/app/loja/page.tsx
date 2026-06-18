@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@supabase/supabase-js'
 import { TuttiLogo, TuttiLogoSmall } from '@/components/TuttiLogo'
 import { PIZZAS, CORES } from '@/lib/constants'
 
@@ -43,6 +44,28 @@ export default function LojaPage() {
   const [fase, setFase] = useState<'form' | 'carrinho' | 'sucesso'>('form')
   const [showWpp, setShowWpp] = useState(false)
   const [totalHoje, setTotalHoje] = useState(0)
+
+  useEffect(() => {
+    async function fetchTotal() {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
+      const hoje = new Date()
+      hoje.setHours(0,0,0,0)
+
+      const { data } = await supabase
+        .from('vendas')
+        .select('quantidade')
+        .gte('vendido_em', hoje.toISOString())
+
+      if (data) {
+        const total = data.reduce((s, v) => s + v.quantidade, 0)
+        setTotalHoje(total)
+      }
+    }
+    fetchTotal()
+  }, [])
 
   const agora = new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
   const totalCarrinho = carrinho.reduce((s, i) => s + i.qty, 0)

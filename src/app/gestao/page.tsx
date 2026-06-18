@@ -16,6 +16,14 @@ const BackIcon = () => (
 const LiveDot = () => (
   <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ADE80', display: 'inline-block', flexShrink: 0 }}/>
 )
+const TrashIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <polyline points="3 6 5 6 21 6"/>
+    <path d="M19 6l-1 14H6L5 6"/>
+    <path d="M10 11v6M14 11v6"/>
+    <path d="M9 6V4h6v2"/>
+  </svg>
+)
 
 export default function GestaoPage() {
   const router = useRouter()
@@ -100,6 +108,15 @@ export default function GestaoPage() {
     setShowReset(false)
     setSenhaInput('')
     setTimeout(() => setResetOk(false), 3000)
+  }
+
+  async function apagarVenda(id: string) {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+    await supabase.from('vendas').delete().eq('id', id)
+    setVendas(prev => prev.filter(v => v.id !== id))
   }
 
   const agora = new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
@@ -296,7 +313,19 @@ export default function GestaoPage() {
                             <div style={{ fontSize: 11, color: '#9FC4A8' }}>{modeloLabels[v.modelo] || v.modelo}</div>
                           </div>
                         </div>
-                        <span style={{ fontSize: 13, fontWeight: 500, color: O }}>×{v.quantidade}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 13, fontWeight: 500, color: O }}>×{v.quantidade}</span>
+                          <button
+                            onClick={() => apagarVenda(v.id)}
+                            style={{ width: 28, height: 28, borderRadius: '50%',
+                              background: '#FEF0E0', border: 'none', cursor: 'pointer',
+                              color: O, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              transition: 'all 0.15s' }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#D4751A'}
+                            onMouseLeave={e => e.currentTarget.style.background = '#FEF0E0'}>
+                            <TrashIcon />
+                          </button>
+                        </div>
                       </div>
                     )
                   })}

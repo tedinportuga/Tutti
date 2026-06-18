@@ -35,15 +35,17 @@ export async function POST(request: Request) {
     const horaFormatada = new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
     const hoje2 = new Date()
     hoje2.setHours(0,0,0,0)
-    const { count } = await supabase
+    const { data: vendasHoje } = await supabase
       .from('vendas')
-      .select('*', { count: 'exact', head: true })
+      .select('quantidade')
       .gte('vendido_em', hoje2.toISOString())
+
+    const totalDia = vendasHoje?.reduce((s, v) => s + v.quantidade, 0) || 0
 
     await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/notificacao`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sabor, modelo, qty, hora: horaFormatada, totalDia: count || 0 })
+      body: JSON.stringify({ sabor, modelo, qty, hora: horaFormatada, totalDia })
     }).catch(() => {})
 
     return NextResponse.json({ success: true, data })

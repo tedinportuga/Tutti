@@ -226,7 +226,7 @@ export default function LojaPage() {
                       ))}
                     </div>
                     <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #F0EAE0', fontSize: 12, color: '#667781' }}>
-                      Total do dia: <strong style={{ color: V }}>{totalHoje + totalCarrinho} pizzas</strong>
+                      Total do dia: <strong style={{ color: V }}>{totalHoje} pizzas</strong>
                     </div>
                   </div>
                 </div>

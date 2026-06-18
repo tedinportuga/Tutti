@@ -37,48 +37,47 @@ export default function GestaoPage() {
     Array(7).fill(null).map(() => Array(10).fill(0))
   )
 
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
+  async function fetchVendas() {
+    const hoje = new Date()
+    hoje.setHours(0,0,0,0)
+    console.log('Fetching vendas desde:', hoje.toISOString())
+
+    const { data, error } = await supabase
+      .from('vendas')
+      .select('*')
+      .gte('vendido_em', hoje.toISOString())
+      .order('vendido_em', { ascending: false })
+
+    console.log('Vendas:', data, 'Erro:', error)
+    if (data) setVendas(data)
+  }
+
+  async function fetchHeatmap() {
+    const { data } = await supabase
+      .from('vendas')
+      .select('dia_semana, hora, quantidade')
+
+    const matriz = Array(7).fill(null).map(() => Array(10).fill(0))
+
+    if (data) {
+      data.forEach(v => {
+        const diaIndex = v.dia_semana === 0 ? 6 : v.dia_semana - 1
+        const horaIndex = v.hora - 14
+        if (horaIndex >= 0 && horaIndex < 10 && diaIndex >= 0 && diaIndex < 7) {
+          matriz[diaIndex][horaIndex] += v.quantidade
+        }
+      })
+    }
+
+    setHeatmapData(matriz)
+  }
+
   useEffect(() => {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
-
-    async function fetchVendas() {
-      const hoje = new Date()
-      hoje.setHours(0,0,0,0)
-      console.log('Fetching vendas desde:', hoje.toISOString())
-
-      const { data, error } = await supabase
-        .from('vendas')
-        .select('*')
-        .gte('vendido_em', hoje.toISOString())
-        .order('vendido_em', { ascending: false })
-
-      console.log('Vendas:', data, 'Erro:', error)
-      if (data) setVendas(data)
-    }
-
-    // Calcula heatmap dos últimos 30 dias
-    async function fetchHeatmap() {
-      const { data } = await supabase
-        .from('vendas')
-        .select('dia_semana, hora, quantidade')
-
-      const matriz = Array(7).fill(null).map(() => Array(10).fill(0))
-
-      if (data) {
-        data.forEach(v => {
-          const diaIndex = v.dia_semana === 0 ? 6 : v.dia_semana - 1
-          const horaIndex = v.hora - 14
-          if (horaIndex >= 0 && horaIndex < 10 && diaIndex >= 0 && diaIndex < 7) {
-            matriz[diaIndex][horaIndex] += v.quantidade
-          }
-        })
-      }
-
-      setHeatmapData(matriz)
-    }
-
     fetchVendas()
     fetchHeatmap()
 
@@ -98,12 +97,11 @@ export default function GestaoPage() {
       setTimeout(() => setResetErro(false), 2000)
       return
     }
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    )
     await supabase.from('vendas').delete().neq('id', '00000000-0000-0000-0000-000000000000')
     setVendas([])
+    setHeatmapData(Array(7).fill(null).map(() => Array(10).fill(0)))
+    await fetchVendas()
+    await fetchHeatmap()
     setResetOk(true)
     setShowReset(false)
     setSenhaInput('')

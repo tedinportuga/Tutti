@@ -104,6 +104,11 @@ export default function LojaPage() {
     if (carrinho.length === 0) return
     setFase('sucesso')
 
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+
     for (const item of carrinho) {
       await fetch('/api/vendas', {
         method: 'POST',
@@ -112,7 +117,14 @@ export default function LojaPage() {
       }).catch(() => {})
     }
 
-    setTotalHoje(t => t + totalCarrinho)
+    const hoje = new Date()
+    hoje.setHours(0,0,0,0)
+    const { data } = await supabase
+      .from('vendas')
+      .select('quantidade')
+      .gte('vendido_em', hoje.toISOString())
+    if (data) setTotalHoje(data.reduce((s, v) => s + v.quantidade, 0))
+
     setTimeout(() => setShowWpp(true), 900)
     setTimeout(() => {
       setFase('form')

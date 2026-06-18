@@ -124,6 +124,8 @@ export default function GestaoPage() {
       })()
     : '—'
 
+  console.log('Modelos nas vendas:', vendas.map(v => v.modelo))
+
   const modelosData = [
     { m: 'Sabores do Mar', c: vendas.filter(v=>v.modelo==='Sabores do Mar').reduce((s,v)=>s+v.quantidade,0), p: 0 },
     { m: 'Clássica', c: vendas.filter(v=>v.modelo==='Clássica').reduce((s,v)=>s+v.quantidade,0), p: 0 },

@@ -8,7 +8,7 @@ import { PIZZAS, CORES } from '@/lib/constants'
 const { V, VM, O, C, F } = CORES
 
 type Modelo = 'classica' | 'mar' | 'especial' | 'premium' | null
-type Fase = 'form' | 'confirmar' | 'sucesso'
+type ItemCarrinho = { modelo: string; modeloLabel: string; sabor: string; qty: number }
 
 const BackIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -25,6 +25,11 @@ const StarIcon = () => (
     <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
   </svg>
 )
+const TrashIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+  </svg>
+)
 const LiveDot = () => (
   <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ADE80', display: 'inline-block', flexShrink: 0 }}/>
 )
@@ -34,34 +39,63 @@ export default function LojaPage() {
   const [modelo, setModelo] = useState<Modelo>(null)
   const [sabor, setSabor] = useState<string | null>(null)
   const [qty, setQty] = useState(1)
-  const [fase, setFase] = useState<Fase>('form')
-  const [ultimaVenda, setUltimaVenda] = useState<{ sabor: string; modelo: string; qty: number; hora: string } | null>(null)
+  const [carrinho, setCarrinho] = useState<ItemCarrinho[]>([])
+  const [fase, setFase] = useState<'form' | 'carrinho' | 'sucesso'>('form')
   const [showWpp, setShowWpp] = useState(false)
   const [totalHoje, setTotalHoje] = useState(0)
 
   const agora = new Date().toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })
+  const totalCarrinho = carrinho.reduce((s, i) => s + i.qty, 0)
 
-  function confirmar() {
-    if (modelo && sabor) setFase('confirmar')
+  function adicionarAoCarrinho() {
+    if (!modelo || !sabor) return
+    const existing = carrinho.findIndex(i => i.sabor === sabor && i.modelo === modelo)
+    if (existing >= 0) {
+      const novo = [...carrinho]
+      novo[existing].qty += qty
+      setCarrinho(novo)
+    } else {
+      setCarrinho(prev => [...prev, {
+        modelo,
+        modeloLabel: PIZZAS[modelo].label,
+        sabor,
+        qty
+      }])
+    }
+    setModelo(null)
+    setSabor(null)
+    setQty(1)
   }
 
-  async function registar() {
-    if (!modelo || !sabor) return
-    const venda = { sabor, modelo: PIZZAS[modelo].label, qty, hora: agora }
-    setUltimaVenda(venda)
-    setTotalHoje(t => t + qty)
+  function removerDoCarrinho(index: number) {
+    setCarrinho(prev => prev.filter((_, i) => i !== index))
+  }
+
+  function alterarQty(index: number, delta: number) {
+    const novo = [...carrinho]
+    novo[index].qty = Math.max(1, novo[index].qty + delta)
+    setCarrinho(novo)
+  }
+
+  async function confirmarCarrinho() {
+    if (carrinho.length === 0) return
     setFase('sucesso')
+
+    for (const item of carrinho) {
+      await fetch('/api/vendas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sabor: item.sabor, modelo: item.modelo, qty: item.qty })
+      }).catch(() => {})
+    }
+
+    setTotalHoje(t => t + totalCarrinho)
     setTimeout(() => setShowWpp(true), 900)
     setTimeout(() => {
-      setFase('form'); setModelo(null); setSabor(null); setQty(1)
-      setUltimaVenda(null); setShowWpp(false)
+      setFase('form')
+      setCarrinho([])
+      setShowWpp(false)
     }, 6000)
-    // POST to API (non-blocking)
-    fetch('/api/vendas', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sabor, modelo, qty })
-    }).catch(() => {})
   }
 
   return (
@@ -69,15 +103,13 @@ export default function LojaPage() {
       {/* Sidebar */}
       <div className="app-sidebar">
         <div>
-          <button
-            onClick={() => router.push('/')}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#9FC4A8', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 28, padding: 0 }}>
+          <button onClick={() => router.push('/')} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#9FC4A8', background: 'none', border: 'none', cursor: 'pointer', marginBottom: 28, padding: 0 }}>
             <BackIcon /> Voltar
           </button>
           <TuttiLogoSmall />
           <div style={{ width: 28, height: 1, background: O, marginBottom: 16 }} />
           <p style={{ fontSize: 12, lineHeight: 1.7, color: '#6B9E7A' }}>
-            Seleciona o modelo e o sabor. A gerente é notificada automaticamente via WhatsApp.
+            Adiciona pizzas ao carrinho e confirma tudo de uma vez.
           </p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -88,22 +120,29 @@ export default function LojaPage() {
             <div className="font-display" style={{ fontSize: 38, color: C }}>{totalHoje}</div>
             <div style={{ fontSize: 11, marginTop: 2, color: '#6B9E7A' }}>pizzas saídas</div>
           </div>
-          {sabor && modelo && fase === 'form' && (
+          {carrinho.length > 0 && (
             <div style={{ borderRadius: 14, padding: 14, background: '#142D22' }}>
-              <div style={{ fontSize: 11, marginBottom: 4, color: '#6B9E7A' }}>A preparar</div>
-              <div className="font-display" style={{ fontSize: 16, color: C }}>{sabor}</div>
-              <div style={{ fontSize: 11, marginTop: 2, color: '#9FC4A8' }}>{PIZZAS[modelo].label} · ×{qty}</div>
+              <div style={{ fontSize: 11, marginBottom: 8, color: '#6B9E7A' }}>No carrinho</div>
+              {carrinho.map((item, i) => (
+                <div key={i} style={{ fontSize: 12, color: C, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{item.sabor}</span>
+                  <span style={{ color: O }}>×{item.qty}</span>
+                </div>
+              ))}
+              <div style={{ borderTop: '1px solid #2E5E45', marginTop: 8, paddingTop: 8, fontSize: 12, color: '#9FC4A8', display: 'flex', justifyContent: 'space-between' }}>
+                <span>Total</span>
+                <span style={{ color: C, fontWeight: 500 }}>×{totalCarrinho}</span>
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Conteúdo com scroll */}
       <div className="app-main">
         <div style={{ maxWidth: 580, margin: '0 auto', padding: '32px 24px 80px' }}>
 
           {/* Mobile header */}
-          <div style={{ marginBottom: 28, display: 'flex', flexDirection: 'column' }} className="md:hidden">
+          <div style={{ marginBottom: 28 }} className="md:hidden">
             <button onClick={() => router.push('/')} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: VM, background: 'none', border: 'none', cursor: 'pointer', marginBottom: 16, padding: 0 }}>
               <BackIcon /> Voltar
             </button>
@@ -116,20 +155,26 @@ export default function LojaPage() {
             </div>
           </div>
 
-          {/* ── SUCESSO ── */}
-          {fase === 'sucesso' && ultimaVenda && (
+          {/* SUCESSO */}
+          {fase === 'sucesso' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               <div style={{ borderRadius: 22, padding: 28, background: V, textAlign: 'center' }}>
                 <div style={{ width: 56, height: 56, borderRadius: '50%', background: VM, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
                   <CheckIcon size={26} color={C} />
                 </div>
                 <h2 className="font-display" style={{ fontSize: 28, color: C, marginBottom: 6 }}>Registado!</h2>
-                <p className="font-display" style={{ fontSize: 18, fontStyle: 'italic', color: '#9FC4A8', marginBottom: 3 }}>{ultimaVenda.sabor}</p>
-                <p style={{ fontSize: 12, color: '#6B9E7A' }}>{ultimaVenda.modelo} · ×{ultimaVenda.qty}</p>
+                <p style={{ fontSize: 13, color: '#9FC4A8', marginBottom: 12 }}>{totalCarrinho} pizzas registadas às {agora}</p>
+                <div style={{ background: '#142D22', borderRadius: 12, padding: 12 }}>
+                  {carrinho.map((item, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: C, marginBottom: i < carrinho.length - 1 ? 6 : 0 }}>
+                      <span>{item.sabor}</span>
+                      <span style={{ color: O }}>×{item.qty}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
               <div style={{ transition: 'opacity 0.4s, transform 0.4s', opacity: showWpp ? 1 : 0, transform: showWpp ? 'translateY(0)' : 'translateY(14px)' }}>
                 <div style={{ fontSize: 10, letterSpacing: '0.08em', color: VM, marginBottom: 10, textAlign: 'center' }}>MENSAGEM ENVIADA À GERENTE</div>
-                {/* WhatsApp Preview */}
                 <div style={{ background: '#ECE5DD', borderRadius: 16, padding: 16, maxWidth: 300, margin: '0 auto' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid #D5CEC7' }}>
                     <img src="/logo.jpg" alt="Tutti" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'contain', flexShrink: 0, background: V }} />
@@ -138,57 +183,26 @@ export default function LojaPage() {
                       <div style={{ fontSize: 11, color: '#667781' }}>sistema interno</div>
                     </div>
                   </div>
-                  <div style={{ background: '#fff', borderRadius: '4px 14px 14px 14px', padding: '10px 14px', maxWidth: 260 }}>
-                    <div style={{ fontSize: 12, color: '#667781', marginBottom: 6 }}>🍕 Tutti · {ultimaVenda.hora}</div>
+                  <div style={{ background: '#fff', borderRadius: '4px 14px 14px 14px', padding: '10px 14px' }}>
+                    <div style={{ fontSize: 12, color: '#667781', marginBottom: 6 }}>🍕 Tutti · {agora}</div>
                     <div style={{ fontSize: 13, color: '#111', lineHeight: 1.6 }}>
-                      Nova saída registada<br />
-                      <strong>{ultimaVenda.sabor}</strong> — {ultimaVenda.modelo}<br />
-                      Quantidade: ×{ultimaVenda.qty}
+                      {carrinho.map((item, i) => (
+                        <div key={i}><strong>{item.sabor}</strong> ×{item.qty}</div>
+                      ))}
                     </div>
                     <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #F0EAE0', fontSize: 12, color: '#667781' }}>
-                      Total do dia: <strong style={{ color: V }}>{totalHoje} pizzas</strong>
+                      Total do dia: <strong style={{ color: V }}>{totalHoje + totalCarrinho} pizzas</strong>
                     </div>
-                    <div style={{ textAlign: 'right', fontSize: 10, color: '#8696A0', marginTop: 4 }}>{ultimaVenda.hora} ✓✓</div>
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ── CONFIRMAÇÃO ── */}
-          {fase === 'confirmar' && modelo && sabor && (
-            <div>
-              <div style={{ fontSize: 10, letterSpacing: '0.08em', color: VM, marginBottom: 18 }}>CONFIRMAR VENDA</div>
-              <div style={{ borderRadius: 20, padding: 22, background: '#fff', border: '1.5px solid #D8D0C4', marginBottom: 14 }}>
-                {[
-                  { label: 'Modelo', value: PIZZAS[modelo].label, big: false, orange: false },
-                  { label: 'Sabor', value: sabor, big: true, orange: false },
-                  { label: 'Qtd.', value: `×${qty}`, big: false, orange: true },
-                  { label: 'Hora', value: agora, big: false, orange: false },
-                ].map((row, i, arr) => (
-                  <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 0', borderBottom: i < arr.length - 1 ? '1px solid #F0EAE0' : 'none' }}>
-                    <span style={{ fontSize: 13, color: '#9FC4A8' }}>{row.label}</span>
-                    <span className={row.big ? 'font-display' : ''} style={{ fontSize: row.big ? 17 : row.orange ? 20 : 13, fontWeight: 500, color: row.orange ? O : V }}>
-                      {row.value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={() => setFase('form')} style={{ flex: 1, padding: 15, borderRadius: 14, fontSize: 14, fontWeight: 500, background: '#fff', border: '1.5px solid #D8D0C4', color: V, cursor: 'pointer' }}>
-                  Cancelar
-                </button>
-                <button onClick={registar} className="font-display" style={{ flex: 2, padding: 15, borderRadius: 14, cursor: 'pointer', background: O, color: '#fff', border: 'none', fontSize: 19 }}>
-                  Confirmar
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── FORMULÁRIO ── */}
+          {/* FORMULÁRIO */}
           {fase === 'form' && (
             <>
-              {/* Modelos com foto */}
+              {/* Modelos */}
               <div style={{ marginBottom: 28 }}>
                 <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.08em', color: VM, marginBottom: 12 }}>MODELO</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -244,9 +258,43 @@ export default function LojaPage() {
                 </div>
               )}
 
-              <button onClick={confirmar} disabled={!modelo || !sabor} className="font-display"
-                style={{ width: '100%', padding: 18, borderRadius: 14, fontSize: 21, background: modelo && sabor ? O : '#D8D0C4', color: modelo && sabor ? '#fff' : '#b0a89e', border: 'none', cursor: modelo && sabor ? 'pointer' : 'not-allowed', transition: 'all 0.15s' }}>
-                Registar
+              {/* Botão adicionar */}
+              {sabor && (
+                <button onClick={adicionarAoCarrinho} className="font-display"
+                  style={{ width: '100%', padding: 16, borderRadius: 14, fontSize: 18, background: VM, color: C, border: 'none', cursor: 'pointer', marginBottom: 12, transition: 'all 0.15s' }}>
+                  + Adicionar ao carrinho
+                </button>
+              )}
+
+              {/* Carrinho */}
+              {carrinho.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.08em', color: VM, marginBottom: 12 }}>CARRINHO ({totalCarrinho} pizzas)</div>
+                  <div style={{ borderRadius: 16, overflow: 'hidden', background: '#fff', border: '1.5px solid #D8D0C4' }}>
+                    {carrinho.map((item, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: i < carrinho.length - 1 ? '1px solid #F0EAE0' : 'none' }}>
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 500, color: V }}>{item.sabor}</div>
+                          <div style={{ fontSize: 11, color: '#9FC4A8' }}>{item.modeloLabel}</div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <button onClick={() => alterarQty(i, -1)} style={{ width: 28, height: 28, borderRadius: '50%', background: '#F2EDE4', border: 'none', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                          <span style={{ fontSize: 16, fontWeight: 500, color: V, minWidth: 20, textAlign: 'center' }}>{item.qty}</span>
+                          <button onClick={() => alterarQty(i, 1)} style={{ width: 28, height: 28, borderRadius: '50%', background: '#F2EDE4', border: 'none', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                          <button onClick={() => removerDoCarrinho(i)} style={{ width: 28, height: 28, borderRadius: '50%', background: '#FEF0E0', border: 'none', cursor: 'pointer', color: O, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <TrashIcon />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Botão confirmar */}
+              <button onClick={confirmarCarrinho} disabled={carrinho.length === 0} className="font-display"
+                style={{ width: '100%', padding: 18, borderRadius: 14, fontSize: 21, background: carrinho.length > 0 ? O : '#D8D0C4', color: carrinho.length > 0 ? '#fff' : '#b0a89e', border: 'none', cursor: carrinho.length > 0 ? 'pointer' : 'not-allowed', transition: 'all 0.15s' }}>
+                {carrinho.length > 0 ? `Confirmar ${totalCarrinho} pizza${totalCarrinho > 1 ? 's' : ''}` : 'Carrinho vazio'}
               </button>
             </>
           )}

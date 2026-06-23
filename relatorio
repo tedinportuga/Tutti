@@ -1,0 +1,16 @@
+.github/workflows/relatorio-diario.yml
+name: Relatório Diário às 23:59
+
+on:
+  schedule:
+    - cron: '59 23 * * *'
+  workflow_dispatch:
+
+jobs:
+  relatorio:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enviar relatório
+        run: |
+          curl -X GET "https://tuttipizzaria.netlify.app/api/export" \
+            -H "Content-Type: application/json"

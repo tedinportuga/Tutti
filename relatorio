@@ -3,7 +3,7 @@ name: Relatório Diário às 23:59
 
 on:
   schedule:
-    - cron: '59 23 * * *'
+    - cron: '59 22 * * *'
   workflow_dispatch:
 
 jobs:
